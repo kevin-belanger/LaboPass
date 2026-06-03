@@ -1,0 +1,298 @@
+using LaboPass.Forms;
+using LaboPass.Models;
+using LaboPass.Services;
+
+namespace LaboPass;
+
+public sealed class MainForm : Form
+{
+    private readonly VaultStore vaultStore = new();
+    private readonly TotpService totpService = new();
+    private readonly QrService qrService = new();
+    private readonly List<VaultEntry> entries;
+    private readonly DataGridView grid = new();
+    private readonly System.Windows.Forms.Timer refreshTimer = new();
+    private readonly Label statusLabel = new();
+
+    public MainForm()
+    {
+        entries = vaultStore.Load();
+
+        Text = "LaboPass";
+        StartPosition = FormStartPosition.CenterScreen;
+        MinimumSize = new Size(1000, 600);
+        Size = new Size(1180, 720);
+        Font = new Font("Segoe UI", 10F);
+        Icon = AppIconProvider.GetApplicationIcon();
+
+        BuildInterface();
+        RefreshGrid();
+
+        refreshTimer.Interval = 1000;
+        refreshTimer.Tick += (_, _) => RefreshTotpCells();
+        refreshTimer.Start();
+
+        Shown += MainForm_Shown;
+    }
+
+    private VaultEntry? SelectedEntry => grid.CurrentRow?.DataBoundItem as VaultEntry;
+
+    private void BuildInterface()
+    {
+        TableLayoutPanel root = new()
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 4,
+            Padding = new Padding(14)
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+
+        Label warning = new()
+        {
+            Text = "Outil pédagogique local. Ne pas utiliser pour des mots de passe réels, personnels ou de production.",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font(Font, FontStyle.Bold),
+            ForeColor = Color.DarkRed
+        };
+        root.Controls.Add(warning, 0, 0);
+
+        grid.Dock = DockStyle.Fill;
+        grid.AutoGenerateColumns = false;
+        grid.AllowUserToAddRows = false;
+        grid.AllowUserToDeleteRows = false;
+        grid.ReadOnly = true;
+        grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        grid.MultiSelect = false;
+        grid.RowHeadersVisible = false;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Libellé", DataPropertyName = nameof(VaultEntry.Label), FillWeight = 150 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Nom d'utilisateur", DataPropertyName = nameof(VaultEntry.Username), FillWeight = 190 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Code MFA", Name = "TotpCode", FillWeight = 90 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Temps restant", Name = "TotpRemaining", FillWeight = 90 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", DataPropertyName = nameof(VaultEntry.Notes), FillWeight = 180 });
+        grid.CellDoubleClick += (_, _) => EditSelected();
+        root.Controls.Add(grid, 0, 1);
+
+        statusLabel.Dock = DockStyle.Fill;
+        statusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        root.Controls.Add(statusLabel, 0, 2);
+
+        FlowLayoutPanel buttons = new()
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+
+        buttons.Controls.Add(MakeButton("Ajouter un identifiant", 180, (_, _) => AddEntry()));
+        buttons.Controls.Add(MakeButton("Modifier", 110, (_, _) => EditSelected()));
+        buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected()));
+        buttons.Controls.Add(MakeButton("Copier utilisateur", 150, (_, _) => CopySelectedUsername()));
+        buttons.Controls.Add(MakeButton("Copier mot de passe", 170, (_, _) => CopySelectedPassword()));
+        buttons.Controls.Add(MakeButton("Afficher le QR", 140, (_, _) => ShowSelectedQr()));
+        root.Controls.Add(buttons, 0, 3);
+
+        Controls.Add(root);
+    }
+
+    private static Button MakeButton(string text, int width, EventHandler handler)
+    {
+        Button button = new()
+        {
+            Text = text,
+            Width = width,
+            Height = 38,
+            Margin = new Padding(0, 4, 8, 4)
+        };
+        button.Click += handler;
+        return button;
+    }
+
+    private void MainForm_Shown(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(vaultStore.LastWarning))
+        {
+            MessageBox.Show(this, vaultStore.LastWarning, "vault.json", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
+    private void RefreshGrid()
+    {
+        Guid? selectedId = SelectedEntry?.Id;
+        grid.DataSource = null;
+        grid.DataSource = entries.OrderBy(e => e.Label).ToList();
+        RestoreSelection(selectedId);
+        RefreshTotpCells();
+        statusLabel.Text = $"{entries.Count} identifiant(s) - stockage: {vaultStore.VaultPath}";
+    }
+
+    private void RefreshTotpCells()
+    {
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            if (row.DataBoundItem is not VaultEntry entry)
+            {
+                continue;
+            }
+
+            TotpDisplay display = totpService.GetDisplay(entry.TotpUri);
+            row.Cells["TotpCode"].Value = display.Code;
+            row.Cells["TotpRemaining"].Value = display.Code.Length == 0 ? "" : $"{display.SecondsRemaining} s";
+            row.DefaultCellStyle.ForeColor = display.IsValid ? SystemColors.ControlText : Color.DarkRed;
+            row.Cells["TotpCode"].ToolTipText = display.Message;
+        }
+    }
+
+    private void RestoreSelection(Guid? selectedId)
+    {
+        if (selectedId is null)
+        {
+            return;
+        }
+
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            if (row.DataBoundItem is VaultEntry entry && entry.Id == selectedId)
+            {
+                row.Selected = true;
+                grid.CurrentCell = row.Cells[0];
+                return;
+            }
+        }
+    }
+
+    private void AddEntry()
+    {
+        using EntryForm form = new(qrService, totpService);
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        entries.Add(form.Entry);
+        SaveAndRefresh(form.Entry.Id);
+    }
+
+    private void EditSelected()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        using EntryForm form = new(qrService, totpService, selected);
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        int index = entries.FindIndex(e => e.Id == selected.Id);
+        if (index >= 0)
+        {
+            entries[index] = form.Entry;
+        }
+
+        SaveAndRefresh(form.Entry.Id);
+    }
+
+    private void DeleteSelected()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        DialogResult confirm = MessageBox.Show(
+            this,
+            $"Supprimer l'identifiant \"{selected.Label}\"?",
+            "Confirmer la suppression",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (confirm != DialogResult.Yes)
+        {
+            return;
+        }
+
+        entries.RemoveAll(e => e.Id == selected.Id);
+        SaveAndRefresh(null);
+    }
+
+    private void CopySelectedUsername()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        Clipboard.SetText(selected.Username);
+        statusLabel.Text = "Nom d'utilisateur copié.";
+    }
+
+    private void CopySelectedPassword()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        Clipboard.SetText(selected.Password);
+        statusLabel.Text = "Mot de passe copié.";
+    }
+
+    private void ShowSelectedQr()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(selected.TotpUri))
+        {
+            MessageBox.Show(this, "Cette entrée ne contient pas d'URI TOTP.", "QR non disponible", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!selected.TotpUri.StartsWith("otpauth://", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(this, "L'URI TOTP enregistrée ne commence pas par otpauth://.", "URI invalide", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            using QrDisplayForm form = new(selected.Label, selected.TotpUri, qrService);
+            form.ShowDialog(this);
+        }
+        catch
+        {
+            MessageBox.Show(this, "Impossible de générer le QR code avec cette URI.", "Erreur QR", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void SaveAndRefresh(Guid? selectedId)
+    {
+        vaultStore.Save(entries);
+        RefreshGrid();
+        RestoreSelection(selectedId);
+    }
+
+    private void ShowSelectionRequired()
+    {
+        MessageBox.Show(this, "Sélectionne d'abord une entrée dans la liste.", "Aucune sélection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+}

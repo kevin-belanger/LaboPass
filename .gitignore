@@ -1,0 +1,8 @@
+source/bin/
+source/obj/
+.vs/
+*.user
+
+LaboPass.exe
+vault.json
+
