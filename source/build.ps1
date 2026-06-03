@@ -16,7 +16,7 @@ if (Test-Path -LiteralPath $publishDir) {
     Remove-Item -LiteralPath $publishDir -Recurse -Force
 }
 
-dotnet publish $sourceProject -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o $publishDir
+dotnet publish $sourceProject -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:EnableCompressionInSingleFile=true -o $publishDir
 
 Copy-Item -LiteralPath $exeSource -Destination $exeDestination -Force
 
