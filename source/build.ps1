@@ -1,8 +1,9 @@
 $ErrorActionPreference = "Stop"
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourceProject = Join-Path $root "source\LaboPass.csproj"
-$publishDir = Join-Path $root "source\bin\portable-win-x64"
+$sourceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent $sourceRoot
+$sourceProject = Join-Path $sourceRoot "LaboPass.csproj"
+$publishDir = Join-Path $sourceRoot "bin\portable-win-x64"
 $exeSource = Join-Path $publishDir "LaboPass.exe"
 $exeDestination = Join-Path $root "LaboPass.exe"
 $vaultPath = Join-Path $root "vault.json"

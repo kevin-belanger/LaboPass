@@ -1,36 +1,38 @@
 LaboPass
 ========
 
-LaboPass est une petite application Windows locale destinée aux environnements pédagogiques de laboratoire.
-Elle conserve des identifiants de tenants Microsoft 365 temporaires créés par des élèves et les URI TOTP/MFA associées.
+LaboPass est une petite application Windows locale destinee aux environnements pedagogiques de laboratoire.
+Elle permet de conserver des identifiants de test, des mots de passe et des URI TOTP completes utilisees pour generer des codes MFA.
 
 AVERTISSEMENT IMPORTANT
 -----------------------
-LaboPass est un outil pédagogique local destiné aux environnements de laboratoire.
-Il ne doit pas être utilisé pour stocker des mots de passe réels, des comptes personnels ou des accès de production.
-Le fichier vault.json est stocké en clair dans cette première version.
+LaboPass est un outil pedagogique local destine aux environnements de laboratoire.
+Il ne doit pas etre utilise pour stocker des mots de passe reels, des comptes personnels ou des acces de production.
+Le fichier vault.json est stocke en clair dans cette premiere version.
 
 Utilisation
 -----------
 - Lancer LaboPass.exe.
-- Cliquer sur "Ajouter un identifiant" pour enregistrer un libellé, un nom d'utilisateur, un mot de passe, une URI TOTP complète et des notes.
-- Dans le formulaire d'ajout ou modification, utiliser "Coller le QR depuis le presse-papiers" après avoir copié une image QR depuis Microsoft.
-- Les codes MFA/TOTP sont rafraîchis automatiquement.
-- Utiliser "Afficher le QR" pour régénérer un QR code à partir de l'URI TOTP complète enregistrée.
+- Cliquer sur "Ajouter un identifiant" pour enregistrer un libelle, un nom d'utilisateur, un mot de passe, une URI TOTP complete et des notes.
+- Dans le formulaire d'ajout ou modification, utiliser "Coller le QR depuis le presse-papiers" apres avoir copie une image QR contenant une URI otpauth://.
+- Les codes MFA/TOTP sont rafraichis automatiquement.
+- Utiliser "Afficher le QR" pour regenerer un QR code a partir de l'URI TOTP complete enregistree.
 
 Stockage
 --------
-L'application lit et écrit vault.json dans le même dossier que LaboPass.exe.
-Si vault.json est absent, il est créé automatiquement.
+L'application lit et ecrit vault.json dans le meme dossier que LaboPass.exe.
+Si vault.json est absent, il est cree automatiquement.
 Si vault.json est vide ou invalide, LaboPass affiche un message clair et repart avec une liste vide.
 
 Publication portable
 --------------------
-Depuis la racine du dépôt, exécuter:
+Depuis la racine du depot, executer:
 
-    .\build.ps1
+    .\source\build.ps1
 
-Le script publie l'application en Release, win-x64, self-contained, single-file, puis copie LaboPass.exe à la racine.
-Le code source reste dans le dossier source.
+Le script publie l'application en Release, win-x64, self-contained, single-file, puis copie LaboPass.exe a la racine.
+Les fichiers temporaires de build restent dans source\bin.
 
+Credits
+-------
 Password icons created by Smashicons - Flaticon - https://www.flaticon.com/free-icons/password
