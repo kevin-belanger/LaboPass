@@ -20,10 +20,11 @@ public sealed class MainForm : Form
 
         Text = "LaboPass";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1000, 600);
+        MinimumSize = new Size(1020, 620);
         Size = new Size(1180, 720);
         Font = new Font("Segoe UI", 10F);
         Icon = AppIconProvider.GetApplicationIcon();
+        BackColor = UiTheme.AppBackColor;
 
         BuildInterface();
         RefreshGrid();
@@ -43,22 +44,14 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             RowCount = 4,
-            Padding = new Padding(14)
+            Padding = new Padding(18)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
 
-        Label warning = new()
-        {
-            Text = "Outil pédagogique local. Ne pas utiliser pour des mots de passe réels, personnels ou de production.",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font(Font, FontStyle.Bold),
-            ForeColor = Color.DarkRed
-        };
-        root.Controls.Add(warning, 0, 0);
+        root.Controls.Add(CreateNoticePanel(), 0, 0);
 
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
@@ -69,6 +62,7 @@ public sealed class MainForm : Form
         grid.MultiSelect = false;
         grid.RowHeadersVisible = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        UiTheme.StyleGrid(grid);
         grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Libellé", DataPropertyName = nameof(VaultEntry.Label), FillWeight = 150 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Nom d'utilisateur", DataPropertyName = nameof(VaultEntry.Username), FillWeight = 190 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Code MFA", Name = "TotpCode", FillWeight = 90 });
@@ -79,6 +73,7 @@ public sealed class MainForm : Form
 
         statusLabel.Dock = DockStyle.Fill;
         statusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        statusLabel.ForeColor = UiTheme.MutedTextColor;
         root.Controls.Add(statusLabel, 0, 2);
 
         FlowLayoutPanel buttons = new()
@@ -88,27 +83,76 @@ public sealed class MainForm : Form
             WrapContents = false
         };
 
-        buttons.Controls.Add(MakeButton("Ajouter un identifiant", 180, (_, _) => AddEntry()));
+        buttons.Controls.Add(MakeButton("Ajouter un identifiant", 190, (_, _) => AddEntry(), primary: true));
         buttons.Controls.Add(MakeButton("Modifier", 110, (_, _) => EditSelected()));
-        buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected()));
-        buttons.Controls.Add(MakeButton("Copier utilisateur", 150, (_, _) => CopySelectedUsername()));
-        buttons.Controls.Add(MakeButton("Copier mot de passe", 170, (_, _) => CopySelectedPassword()));
+        buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected(), danger: true));
+        buttons.Controls.Add(MakeButton("Copier utilisateur", 155, (_, _) => CopySelectedUsername()));
+        buttons.Controls.Add(MakeButton("Copier mot de passe", 175, (_, _) => CopySelectedPassword()));
         buttons.Controls.Add(MakeButton("Afficher le QR", 140, (_, _) => ShowSelectedQr()));
         root.Controls.Add(buttons, 0, 3);
 
         Controls.Add(root);
     }
 
-    private static Button MakeButton(string text, int width, EventHandler handler)
+    private static Control CreateNoticePanel()
+    {
+        Panel panel = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UiTheme.NoticeBackColor,
+            Padding = new Padding(14, 10, 14, 10),
+            Margin = new Padding(0, 0, 0, 14)
+        };
+        panel.Paint += (_, e) =>
+        {
+            using Pen pen = new(UiTheme.NoticeBorderColor);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        };
+
+        Label title = new()
+        {
+            Text = "Utilisation prévue",
+            Dock = DockStyle.Top,
+            Height = 22,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = UiTheme.NoticeTextColor
+        };
+        Label text = new()
+        {
+            Text = "LaboPass est conçu pour les environnements de test. Il permet de conserver des identifiants, des mots de passe et des codes MFA associés à des comptes de laboratoire. Les données sont stockées localement sans chiffrement; n'utilisez pas cette application pour des comptes personnels ou de production.",
+            Dock = DockStyle.Fill,
+            ForeColor = UiTheme.NoticeTextColor,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        panel.Controls.Add(text);
+        panel.Controls.Add(title);
+        return panel;
+    }
+
+    private static Button MakeButton(string text, int width, EventHandler handler, bool primary = false, bool danger = false)
     {
         Button button = new()
         {
             Text = text,
             Width = width,
-            Height = 38,
-            Margin = new Padding(0, 4, 8, 4)
+            Height = 40,
+            Margin = new Padding(0, 5, 8, 5)
         };
         button.Click += handler;
+        if (primary)
+        {
+            UiTheme.StylePrimaryButton(button);
+        }
+        else if (danger)
+        {
+            UiTheme.StyleDangerButton(button);
+        }
+        else
+        {
+            UiTheme.StyleSecondaryButton(button);
+        }
+
         return button;
     }
 
@@ -142,7 +186,7 @@ public sealed class MainForm : Form
             TotpDisplay display = totpService.GetDisplay(entry.TotpUri);
             row.Cells["TotpCode"].Value = display.Code;
             row.Cells["TotpRemaining"].Value = display.Code.Length == 0 ? "" : $"{display.SecondsRemaining} s";
-            row.DefaultCellStyle.ForeColor = display.IsValid ? SystemColors.ControlText : Color.DarkRed;
+            row.DefaultCellStyle.ForeColor = display.IsValid ? SystemColors.ControlText : UiTheme.ErrorColor;
             row.Cells["TotpCode"].ToolTipText = display.Message;
         }
     }

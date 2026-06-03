@@ -11,10 +11,11 @@ public sealed class QrDisplayForm : Form
     {
         Text = $"QR TOTP - {label}";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(420, 500);
-        Size = new Size(480, 560);
+        MinimumSize = new Size(440, 520);
+        Size = new Size(500, 580);
         Font = new Font("Segoe UI", 10F);
         Icon = AppIconProvider.GetApplicationIcon();
+        BackColor = UiTheme.AppBackColor;
 
         qrImage = qrService.CreateQrImage(totpUri, 10);
         BuildInterface(totpUri);
@@ -36,17 +37,41 @@ public sealed class QrDisplayForm : Form
         TableLayoutPanel layout = new()
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(16),
-            RowCount = 3
+            Padding = new Padding(18),
+            RowCount = 4
         };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+
+        Label heading = new()
+        {
+            Text = "QR code TOTP",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font(Font.FontFamily, 12F, FontStyle.Bold)
+        };
+        layout.Controls.Add(heading, 0, 0);
+
+        Panel qrPanel = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UiTheme.SurfaceColor,
+            Padding = new Padding(16),
+            Margin = new Padding(0, 0, 0, 12)
+        };
+        qrPanel.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(210, 216, 224));
+            e.Graphics.DrawRectangle(pen, 0, 0, qrPanel.Width - 1, qrPanel.Height - 1);
+        };
 
         pictureBox.Dock = DockStyle.Fill;
         pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
         pictureBox.Image = qrImage;
-        layout.Controls.Add(pictureBox, 0, 0);
+        qrPanel.Controls.Add(pictureBox);
+        layout.Controls.Add(qrPanel, 0, 1);
 
         TextBox uriBox = new()
         {
@@ -56,7 +81,8 @@ public sealed class QrDisplayForm : Form
             ScrollBars = ScrollBars.Vertical,
             Text = totpUri
         };
-        layout.Controls.Add(uriBox, 0, 1);
+        UiTheme.StyleTextBox(uriBox);
+        layout.Controls.Add(uriBox, 0, 2);
 
         FlowLayoutPanel buttons = new()
         {
@@ -65,13 +91,15 @@ public sealed class QrDisplayForm : Form
             WrapContents = false
         };
 
-        Button closeButton = new() { Text = "Fermer", Width = 110, Height = 38 };
-        Button copyButton = new() { Text = "Copier l'image", Width = 140, Height = 38 };
+        Button closeButton = new() { Text = "Fermer", Width = 110, Height = 40 };
+        Button copyButton = new() { Text = "Copier l'image", Width = 145, Height = 40 };
+        UiTheme.StylePrimaryButton(closeButton);
+        UiTheme.StyleSecondaryButton(copyButton);
         closeButton.Click += (_, _) => Close();
         copyButton.Click += (_, _) => Clipboard.SetImage(qrImage);
         buttons.Controls.Add(closeButton);
         buttons.Controls.Add(copyButton);
-        layout.Controls.Add(buttons, 0, 2);
+        layout.Controls.Add(buttons, 0, 3);
 
         Controls.Add(layout);
     }

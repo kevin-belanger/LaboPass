@@ -24,10 +24,11 @@ public sealed class EntryForm : Form
 
         Text = entry is null ? "Ajouter un identifiant" : "Modifier l'identifiant";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(760, 660);
-        Size = new Size(840, 720);
+        MinimumSize = new Size(780, 680);
+        Size = new Size(860, 720);
         Font = new Font("Segoe UI", 10F);
         Icon = AppIconProvider.GetApplicationIcon();
+        BackColor = UiTheme.AppBackColor;
 
         BuildInterface();
         LoadEntry();
@@ -55,25 +56,36 @@ public sealed class EntryForm : Form
         TableLayoutPanel layout = new()
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(16),
+            Padding = new Padding(18),
             ColumnCount = 2,
-            RowCount = 8
+            RowCount = 9
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        AddRow(layout, 0, "Libellé", labelTextBox);
-        AddRow(layout, 1, "Nom d'utilisateur", CreateTextBoxWithButtons(usernameTextBox, [
+        Label heading = new()
+        {
+            Text = "Informations de l'identifiant",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font(Font.FontFamily, 12F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(35, 40, 46)
+        };
+        layout.Controls.Add(heading, 0, 0);
+        layout.SetColumnSpan(heading, 2);
+
+        AddRow(layout, 1, "Libellé", labelTextBox);
+        AddRow(layout, 2, "Nom d'utilisateur", CreateTextBoxWithButtons(usernameTextBox, [
             MakeSmallButton("Copier", (_, _) => CopyToClipboard(usernameTextBox.Text, "Nom d'utilisateur copié."))
         ]));
 
         passwordTextBox.UseSystemPasswordChar = true;
-        AddRow(layout, 2, "Mot de passe", CreateTextBoxWithButtons(passwordTextBox, [
-            MakeSmallButton("Voir", TogglePasswordVisibility),
+        AddRow(layout, 3, "Mot de passe", CreateTextBoxWithButtons(passwordTextBox, [
+            MakeSmallButton("Afficher", TogglePasswordVisibility),
             MakeSmallButton("Copier", (_, _) => CopyToClipboard(passwordTextBox.Text, "Mot de passe copié."))
         ]));
 
-        AddRow(layout, 3, "URI TOTP complète", totpUriTextBox);
+        AddRow(layout, 4, "URI TOTP complète", totpUriTextBox);
         totpUriTextBox.TextChanged += (_, _) => RefreshTotpPreview();
 
         FlowLayoutPanel qrButtons = new()
@@ -83,33 +95,26 @@ public sealed class EntryForm : Form
             WrapContents = false
         };
 
-        Button pasteQrButton = new()
-        {
-            Text = "Coller le QR depuis le presse-papiers",
-            Height = 40,
-            Width = 260
-        };
-        Button showQrButton = new()
-        {
-            Text = "Afficher le QR",
-            Height = 40,
-            Width = 140
-        };
-        pasteQrButton.Click += PasteQrButton_Click;
-        showQrButton.Click += ShowQrButton_Click;
+        Button pasteQrButton = MakeActionButton("Coller le QR depuis le presse-papiers", 280, PasteQrButton_Click);
+        Button showQrButton = MakeActionButton("Afficher le QR", 140, ShowQrButton_Click);
         qrButtons.Controls.Add(pasteQrButton);
         qrButtons.Controls.Add(showQrButton);
-        AddRow(layout, 4, "", qrButtons);
+        AddRow(layout, 5, "", qrButtons);
 
-        totpStatusLabel.Dock = DockStyle.Fill;
-        totpStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
-        totpStatusLabel.Font = new Font(Font.FontFamily, 12F, FontStyle.Bold);
-        AddRow(layout, 5, "MFA actuel", totpStatusLabel);
+        Panel totpPanel = CreateTotpPanel();
+        layout.Controls.Add(new Label
+        {
+            Text = "MFA actuel",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = UiTheme.MutedTextColor
+        }, 0, 6);
+        layout.Controls.Add(totpPanel, 1, 6);
 
         notesTextBox.Multiline = true;
         notesTextBox.ScrollBars = ScrollBars.Vertical;
         notesTextBox.Height = 130;
-        AddRow(layout, 6, "Notes", notesTextBox);
+        AddRow(layout, 7, "Notes", notesTextBox);
 
         FlowLayoutPanel buttons = new()
         {
@@ -120,23 +125,48 @@ public sealed class EntryForm : Form
 
         Button saveButton = new() { Text = "Enregistrer", Width = 130, Height = 40 };
         Button cancelButton = new() { Text = "Annuler", Width = 110, Height = 40 };
+        UiTheme.StylePrimaryButton(saveButton);
+        UiTheme.StyleSecondaryButton(cancelButton);
         saveButton.Click += SaveButton_Click;
         cancelButton.Click += (_, _) => DialogResult = DialogResult.Cancel;
         buttons.Controls.Add(saveButton);
         buttons.Controls.Add(cancelButton);
 
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        layout.Controls.Add(new Label(), 0, 7);
-        layout.Controls.Add(buttons, 1, 7);
+        layout.Controls.Add(new Label(), 0, 8);
+        layout.Controls.Add(buttons, 1, 8);
 
         Controls.Add(layout);
+    }
+
+    private Panel CreateTotpPanel()
+    {
+        Panel panel = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UiTheme.SurfaceColor,
+            Padding = new Padding(10, 6, 10, 6),
+            Margin = new Padding(0, 8, 0, 8)
+        };
+        panel.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(210, 216, 224));
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        };
+
+        totpStatusLabel.Dock = DockStyle.Fill;
+        totpStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        totpStatusLabel.Font = new Font(Font.FontFamily, 12F, FontStyle.Bold);
+        panel.Controls.Add(totpStatusLabel);
+        return panel;
     }
 
     private static void AddRow(TableLayoutPanel layout, int row, string label, Control control)
@@ -145,11 +175,17 @@ public sealed class EntryForm : Form
         {
             Text = label,
             TextAlign = ContentAlignment.MiddleLeft,
-            Dock = DockStyle.Fill
+            Dock = DockStyle.Fill,
+            ForeColor = UiTheme.MutedTextColor
         };
 
         control.Dock = DockStyle.Fill;
         control.Margin = new Padding(0, 8, 0, 8);
+        if (control is TextBox textBox)
+        {
+            UiTheme.StyleTextBox(textBox);
+        }
+
         layout.Controls.Add(labelControl, 0, row);
         layout.Controls.Add(control, 1, row);
     }
@@ -166,6 +202,7 @@ public sealed class EntryForm : Form
 
         textBox.Dock = DockStyle.Fill;
         textBox.Margin = Padding.Empty;
+        UiTheme.StyleTextBox(textBox);
         panel.Controls.Add(textBox, 0, 0);
 
         for (int i = 0; i < buttons.Count; i++)
@@ -183,9 +220,24 @@ public sealed class EntryForm : Form
         Button button = new()
         {
             Text = text,
-            Width = 76,
+            Width = text.Length > 6 ? 88 : 76,
             Height = 28
         };
+        UiTheme.StyleSecondaryButton(button);
+        button.Click += handler;
+        return button;
+    }
+
+    private static Button MakeActionButton(string text, int width, EventHandler handler)
+    {
+        Button button = new()
+        {
+            Text = text,
+            Width = width,
+            Height = 40,
+            Margin = new Padding(0, 0, 10, 0)
+        };
+        UiTheme.StyleSecondaryButton(button);
         button.Click += handler;
         return button;
     }
@@ -251,7 +303,7 @@ public sealed class EntryForm : Form
 
         if (sender is Button button)
         {
-            button.Text = passwordVisible ? "Masquer" : "Voir";
+            button.Text = passwordVisible ? "Masquer" : "Afficher";
         }
     }
 
@@ -261,14 +313,14 @@ public sealed class EntryForm : Form
         if (string.IsNullOrWhiteSpace(totpUriTextBox.Text))
         {
             totpStatusLabel.Text = "Aucun TOTP configuré";
-            totpStatusLabel.ForeColor = SystemColors.ControlText;
+            totpStatusLabel.ForeColor = UiTheme.MutedTextColor;
             return;
         }
 
         if (!display.IsValid)
         {
             totpStatusLabel.Text = display.Message;
-            totpStatusLabel.ForeColor = Color.DarkRed;
+            totpStatusLabel.ForeColor = UiTheme.ErrorColor;
             return;
         }
 
@@ -286,7 +338,7 @@ public sealed class EntryForm : Form
 
         Clipboard.SetText(text);
         totpStatusLabel.Text = statusMessage;
-        totpStatusLabel.ForeColor = SystemColors.ControlText;
+        totpStatusLabel.ForeColor = UiTheme.MutedTextColor;
     }
 
     private void SaveButton_Click(object? sender, EventArgs e)

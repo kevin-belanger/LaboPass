@@ -45,6 +45,7 @@ public sealed class VaultStore
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             LastWarning = "Le fichier vault.json est invalide ou illisible. LaboPass repart avec une liste vide.";
+            TryResetVaultFile();
             return [];
         }
     }
@@ -56,5 +57,17 @@ public sealed class VaultStore
         // Future encryption can be added here before writing the serialized payload.
         string json = JsonSerializer.Serialize(entries.OrderBy(e => e.Label).ToList(), jsonOptions);
         File.WriteAllText(VaultPath, json);
+    }
+
+    private void TryResetVaultFile()
+    {
+        try
+        {
+            Save([]);
+        }
+        catch
+        {
+            // The user-facing warning from Load already explains that the vault could not be used.
+        }
     }
 }
