@@ -36,7 +36,7 @@ public sealed class EntryForm : Form
         this.totpService = totpService;
         this.saveTotpChange = saveTotpChange;
         noQrImage = LoadNoQrImage();
-        importQrButton = MakeActionButton("Importer le QR depuis le presse-papier", 250, PasteQrButton_Click);
+        importQrButton = MakeActionButton("Importer le QR depuis le presse-papier", 330, PasteQrButton_Click);
         copyMfaButton = MakeSmallButton("Copier", (_, _) => CopyMfaCode());
         Entry = entry is null ? new VaultEntry() : Clone(entry);
 
