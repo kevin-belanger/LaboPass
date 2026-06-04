@@ -80,6 +80,9 @@ public sealed class MainForm : Form
         grid.AutoGenerateColumns = false;
         grid.AllowUserToAddRows = false;
         grid.AllowUserToDeleteRows = false;
+        grid.AllowUserToResizeRows = false;
+        grid.AllowUserToResizeColumns = true;
+        grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         grid.ReadOnly = true;
         grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         grid.MultiSelect = false;

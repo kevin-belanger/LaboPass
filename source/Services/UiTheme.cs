@@ -50,7 +50,9 @@ public static class UiTheme
         grid.EnableHeadersVisualStyles = false;
         grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
         grid.ColumnHeadersDefaultCellStyle.BackColor = GridHeaderColor;
+        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = GridHeaderColor;
         grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(35, 40, 46);
+        grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.FromArgb(35, 40, 46);
         grid.ColumnHeadersDefaultCellStyle.Font = new Font(grid.Font, FontStyle.Bold);
         grid.ColumnHeadersHeight = 38;
         grid.RowTemplate.Height = 34;
