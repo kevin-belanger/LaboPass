@@ -16,7 +16,7 @@ public sealed class VaultStore
         VaultPath = Path.Combine(AppContext.BaseDirectory, "vault.json");
     }
 
-    public string VaultPath { get; }
+    public string VaultPath { get; private set; }
     public string? LastWarning { get; private set; }
 
     public List<VaultEntry> Load()
@@ -57,6 +57,44 @@ public sealed class VaultStore
         // Future encryption can be added here before writing the serialized payload.
         string json = JsonSerializer.Serialize(entries.OrderBy(e => e.Label).ToList(), jsonOptions);
         File.WriteAllText(VaultPath, json);
+    }
+
+    public bool TrySwitchVault(string vaultPath, out List<VaultEntry> loadedEntries, out string errorMessage)
+    {
+        loadedEntries = [];
+        errorMessage = "";
+
+        try
+        {
+            if (!File.Exists(vaultPath))
+            {
+                errorMessage = "Le fichier sélectionné est introuvable.";
+                return false;
+            }
+
+            string json = File.ReadAllText(vaultPath);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                errorMessage = "Le fichier sélectionné est vide.";
+                return false;
+            }
+
+            List<VaultEntry>? entries = JsonSerializer.Deserialize<List<VaultEntry>>(json, jsonOptions);
+            loadedEntries = entries ?? [];
+            VaultPath = vaultPath;
+            LastWarning = null;
+            return true;
+        }
+        catch (JsonException)
+        {
+            errorMessage = "Le fichier sélectionné n'est pas un coffre JSON valide.";
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            errorMessage = "Le fichier sélectionné est impossible à lire.";
+            return false;
+        }
     }
 
     private void TryResetVaultFile()

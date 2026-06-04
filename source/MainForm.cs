@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer refreshTimer = new();
     private readonly System.Windows.Forms.Timer statusResetTimer = new();
     private readonly Label statusLabel = new();
+    private readonly Button openVaultButton = new();
 
     public MainForm()
     {
@@ -99,10 +100,7 @@ public sealed class MainForm : Form
         BuildGridContextMenu();
         root.Controls.Add(grid, 0, 1);
 
-        statusLabel.Dock = DockStyle.Fill;
-        statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-        statusLabel.ForeColor = UiTheme.MutedTextColor;
-        root.Controls.Add(statusLabel, 0, 2);
+        root.Controls.Add(CreateStatusPanel(), 0, 2);
 
         FlowLayoutPanel buttons = new()
         {
@@ -120,6 +118,34 @@ public sealed class MainForm : Form
         root.Controls.Add(buttons, 0, 3);
 
         Controls.Add(root);
+    }
+
+    private Control CreateStatusPanel()
+    {
+        TableLayoutPanel statusPanel = new()
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            Margin = Padding.Empty
+        };
+        statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+
+        statusLabel.Dock = DockStyle.Fill;
+        statusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        statusLabel.ForeColor = UiTheme.MutedTextColor;
+        statusPanel.Controls.Add(statusLabel, 0, 0);
+
+        openVaultButton.Text = "Ouvrir...";
+        openVaultButton.Width = 88;
+        openVaultButton.Height = 30;
+        openVaultButton.Margin = new Padding(8, 5, 0, 5);
+        openVaultButton.Anchor = AnchorStyles.Right;
+        UiTheme.StyleSecondaryButton(openVaultButton);
+        openVaultButton.Click += OpenVaultButton_Click;
+        statusPanel.Controls.Add(openVaultButton, 1, 0);
+
+        return statusPanel;
     }
 
     private void BuildGridContextMenu()
@@ -227,6 +253,39 @@ public sealed class MainForm : Form
     private void UpdateStorageStatus()
     {
         statusLabel.Text = $"{entries.Count} identifiant(s) - stockage: {vaultStore.VaultPath}";
+    }
+
+    private void OpenVaultButton_Click(object? sender, EventArgs e)
+    {
+        using OpenFileDialog dialog = new()
+        {
+            Title = "Ouvrir un coffre LaboPass",
+            Filter = "Fichiers JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+            InitialDirectory = Path.GetDirectoryName(vaultStore.VaultPath)
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (!vaultStore.TrySwitchVault(dialog.FileName, out List<VaultEntry> loadedEntries, out string errorMessage))
+        {
+            MessageBox.Show(
+                this,
+                $"{errorMessage}\n\nLe coffre actuel reste ouvert.",
+                "Coffre non chargé",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        entries.Clear();
+        entries.AddRange(loadedEntries);
+        RefreshGrid();
+        ShowTemporaryStatus("Coffre chargé.");
     }
 
     private void RefreshTotpCells()
