@@ -244,12 +244,31 @@ public sealed class MainForm : Form
         return button;
     }
 
-    private void MainForm_Shown(object? sender, EventArgs e)
+    private async void MainForm_Shown(object? sender, EventArgs e)
     {
         if (!string.IsNullOrWhiteSpace(vaultStore.LastWarning))
         {
             MessageBox.Show(this, vaultStore.LastWarning, "vault.json", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
+        await WarnIfSystemClockLooksWrongAsync();
+    }
+
+    private async Task WarnIfSystemClockLooksWrongAsync()
+    {
+        if (!await SystemClockValidator.IsClockSkewedAsync())
+        {
+            return;
+        }
+
+        MessageBox.Show(
+            this,
+            "L'heure de cet ordinateur semble décalée.\n\n" +
+            "Les codes MFA pourraient ne pas fonctionner.\n\n" +
+            "Vérifiez que l’heure de Windows est exacte et synchronisée automatiquement",
+            "Heure du PC incorrecte",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
     }
 
     private void RefreshGrid()
