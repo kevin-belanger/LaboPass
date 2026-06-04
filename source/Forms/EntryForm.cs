@@ -232,7 +232,8 @@ public sealed class EntryForm : Form
             Dock = DockStyle.Fill,
             BackColor = UiTheme.SurfaceColor,
             Padding = new Padding(12),
-            Margin = new Padding(16, 8, 0, 8)
+            Margin = new Padding(16, 8, 0, 8),
+            Cursor = Cursors.Hand
         };
         panel.Paint += (_, e) =>
         {
@@ -243,7 +244,7 @@ public sealed class EntryForm : Form
         qrPreviewBox.Dock = DockStyle.Fill;
         qrPreviewBox.SizeMode = PictureBoxSizeMode.Zoom;
         qrPreviewBox.Image = noQrImage;
-        qrPreviewBox.Cursor = Cursors.Default;
+        qrPreviewBox.Cursor = Cursors.Hand;
         qrPreviewBox.Click += QrPreviewBox_Click;
         panel.Controls.Add(qrPreviewBox);
         return panel;
