@@ -282,7 +282,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        using EntryForm form = new(qrService, totpService, selected);
+        using EntryForm form = new(qrService, totpService, selected, SaveTotpChangeFromEditor);
         if (form.ShowDialog(this) != DialogResult.OK)
         {
             return;
@@ -414,8 +414,13 @@ public sealed class MainForm : Form
 
         try
         {
-            using QrDisplayForm form = new(selected.Label, selected.TotpUri, qrService);
-            form.ShowDialog(this);
+            using QrDisplayForm form = new(selected.Label, selected.TotpUri, qrService, totpService);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                selected.TotpUri = form.TotpUri;
+                selected.UpdatedAt = DateTime.Now;
+                SaveAndRefresh(selected.Id);
+            }
         }
         catch
         {
@@ -428,6 +433,18 @@ public sealed class MainForm : Form
         vaultStore.Save(entries);
         RefreshGrid();
         RestoreSelection(selectedId);
+    }
+
+    private void SaveTotpChangeFromEditor(VaultEntry updatedEntry)
+    {
+        int index = entries.FindIndex(e => e.Id == updatedEntry.Id);
+        if (index >= 0)
+        {
+            entries[index] = updatedEntry;
+            vaultStore.Save(entries);
+            RefreshGrid();
+            RestoreSelection(updatedEntry.Id);
+        }
     }
 
     private void ShowSelectionRequired()

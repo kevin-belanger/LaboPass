@@ -10,26 +10,34 @@ public sealed class EntryForm : Form
 
     private readonly QrService qrService;
     private readonly TotpService totpService;
+    private readonly Action<VaultEntry>? saveTotpChange;
     private readonly TextBox labelTextBox = new();
     private readonly TextBox usernameTextBox = new();
     private readonly TextBox passwordTextBox = new();
     private readonly TextBox totpUriTextBox = new();
     private readonly TextBox notesTextBox = new();
-    private readonly Label totpStatusLabel = new();
+    private readonly Label mfaCodeLabel = new();
+    private readonly Label mfaRemainingLabel = new();
     private readonly Label copyStatusLabel = new();
     private readonly PictureBox qrPreviewBox = new();
+    private readonly Button importQrButton;
+    private readonly Button copyMfaButton;
     private readonly Image noQrImage;
     private readonly System.Windows.Forms.Timer totpRefreshTimer = new();
     private readonly System.Windows.Forms.Timer copyStatusTimer = new();
     private Image? qrPreviewImage;
     private string? currentQrUri;
+    private string currentMfaCode = "";
     private bool passwordVisible;
 
-    public EntryForm(QrService qrService, TotpService totpService, VaultEntry? entry = null)
+    public EntryForm(QrService qrService, TotpService totpService, VaultEntry? entry = null, Action<VaultEntry>? saveTotpChange = null)
     {
         this.qrService = qrService;
         this.totpService = totpService;
+        this.saveTotpChange = saveTotpChange;
         noQrImage = LoadNoQrImage();
+        importQrButton = MakeActionButton("Importer le QR depuis le presse-papier", 250, PasteQrButton_Click);
+        copyMfaButton = MakeSmallButton("Copier", (_, _) => CopyMfaCode());
         Entry = entry is null ? new VaultEntry() : Clone(entry);
 
         Text = entry is null ? "Ajouter un identifiant" : "Modifier l'identifiant";
@@ -40,6 +48,7 @@ public sealed class EntryForm : Form
         Icon = AppIconProvider.GetApplicationIcon();
         BackColor = UiTheme.AppBackColor;
 
+        totpUriTextBox.TextChanged += (_, _) => RefreshTotpPreview();
         BuildInterface();
         LoadEntry();
 
@@ -107,21 +116,17 @@ public sealed class EntryForm : Form
             MakeSmallButton("Copier", (_, _) => CopyToClipboard(passwordTextBox.Text, "Mot de passe copié."))
         ]));
 
-        AddRow(layout, 4, "URI TOTP", totpUriTextBox);
-        totpUriTextBox.TextChanged += (_, _) => RefreshTotpPreview();
-
-        Button pasteQrButton = MakeActionButton("Coller le QR depuis le presse-papiers", 280, PasteQrButton_Click);
-        AddRow(layout, 5, "", pasteQrButton);
-
-        Panel totpPanel = CreateTotpPanel();
         layout.Controls.Add(new Label
         {
-            Text = "MFA actuel",
+            Text = "Code MFA",
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = UiTheme.MutedTextColor
-        }, 0, 6);
-        layout.Controls.Add(totpPanel, 1, 6);
+        }, 0, 4);
+        layout.Controls.Add(CreateMfaPanel(), 1, 4);
+
+        layout.Controls.Add(new Label(), 0, 5);
+        layout.Controls.Add(importQrButton, 1, 5);
 
         Panel qrPanel = CreateQrPreviewPanel();
         layout.Controls.Add(qrPanel, 2, 4);
@@ -161,9 +166,9 @@ public sealed class EntryForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
@@ -174,7 +179,7 @@ public sealed class EntryForm : Form
         Controls.Add(layout);
     }
 
-    private Panel CreateTotpPanel()
+    private Panel CreateMfaPanel()
     {
         Panel panel = new()
         {
@@ -189,10 +194,34 @@ public sealed class EntryForm : Form
             e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
         };
 
-        totpStatusLabel.Dock = DockStyle.Fill;
-        totpStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
-        totpStatusLabel.Font = new Font(Font.FontFamily, 12F, FontStyle.Bold);
-        panel.Controls.Add(totpStatusLabel);
+        TableLayoutPanel content = new()
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2
+        };
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));
+        content.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
+        content.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
+
+        mfaCodeLabel.Dock = DockStyle.Fill;
+        mfaCodeLabel.TextAlign = ContentAlignment.MiddleLeft;
+        mfaCodeLabel.Font = new Font(Font.FontFamily, 13F, FontStyle.Bold);
+
+        mfaRemainingLabel.Dock = DockStyle.Fill;
+        mfaRemainingLabel.TextAlign = ContentAlignment.MiddleLeft;
+        mfaRemainingLabel.ForeColor = UiTheme.MutedTextColor;
+        mfaRemainingLabel.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
+
+        copyMfaButton.Dock = DockStyle.Fill;
+        copyMfaButton.Margin = new Padding(8, 3, 0, 3);
+        content.Controls.Add(mfaCodeLabel, 0, 0);
+        content.Controls.Add(copyMfaButton, 1, 0);
+        content.SetRowSpan(copyMfaButton, 2);
+        content.Controls.Add(mfaRemainingLabel, 0, 1);
+
+        panel.Controls.Add(content);
         return panel;
     }
 
@@ -289,8 +318,8 @@ public sealed class EntryForm : Form
         {
             Text = text,
             Width = width,
-            Height = 40,
-            Margin = new Padding(0, 0, 10, 0)
+            Height = 38,
+            Margin = new Padding(0, 5, 10, 5)
         };
         UiTheme.StyleSecondaryButton(button);
         button.Click += handler;
@@ -314,7 +343,7 @@ public sealed class EntryForm : Form
         {
             MessageBox.Show(
                 this,
-                "Aucun QR code otpauth:// valide n'a été trouvé dans le presse-papiers.",
+                "Aucun QR code otpauth:// valide n'a été trouvé dans le presse-papier.",
                 "QR introuvable",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -326,15 +355,13 @@ public sealed class EntryForm : Form
 
     private void QrPreviewBox_Click(object? sender, EventArgs e)
     {
-        if (currentQrUri is null)
-        {
-            return;
-        }
-
         try
         {
-            using QrDisplayForm form = new(labelTextBox.Text.Trim(), currentQrUri, qrService);
-            form.ShowDialog(this);
+            using QrDisplayForm form = new(labelTextBox.Text.Trim(), totpUriTextBox.Text.Trim(), qrService, totpService);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                ApplyTotpUriChange(form.TotpUri);
+            }
         }
         catch
         {
@@ -359,22 +386,34 @@ public sealed class EntryForm : Form
         TotpDisplay display = totpService.GetDisplay(uri);
         if (string.IsNullOrWhiteSpace(uri))
         {
-            totpStatusLabel.Text = "Aucun TOTP configuré";
-            totpStatusLabel.ForeColor = UiTheme.MutedTextColor;
+            currentMfaCode = "";
+            mfaCodeLabel.Text = "Aucun TOTP configuré";
+            mfaCodeLabel.ForeColor = UiTheme.MutedTextColor;
+            mfaRemainingLabel.Text = "";
+            copyMfaButton.Enabled = false;
+            importQrButton.Visible = true;
             UpdateQrPreview(null);
             return;
         }
 
         if (!display.IsValid)
         {
-            totpStatusLabel.Text = display.Message;
-            totpStatusLabel.ForeColor = UiTheme.ErrorColor;
+            currentMfaCode = "";
+            mfaCodeLabel.Text = display.Message;
+            mfaCodeLabel.ForeColor = UiTheme.ErrorColor;
+            mfaRemainingLabel.Text = "";
+            copyMfaButton.Enabled = false;
+            importQrButton.Visible = true;
             UpdateQrPreview(null);
             return;
         }
 
-        totpStatusLabel.Text = $"{display.Code} - {display.SecondsRemaining} s";
-        totpStatusLabel.ForeColor = SystemColors.ControlText;
+        currentMfaCode = display.Code;
+        mfaCodeLabel.Text = display.Code;
+        mfaCodeLabel.ForeColor = SystemColors.ControlText;
+        mfaRemainingLabel.Text = $"Renouvellement dans {display.SecondsRemaining} s";
+        copyMfaButton.Enabled = true;
+        importQrButton.Visible = false;
         UpdateQrPreview(uri);
     }
 
@@ -392,7 +431,7 @@ public sealed class EntryForm : Form
         if (validUri is null)
         {
             qrPreviewBox.Image = noQrImage;
-            qrPreviewBox.Cursor = Cursors.Default;
+            qrPreviewBox.Cursor = Cursors.Hand;
             return;
         }
 
@@ -406,8 +445,20 @@ public sealed class EntryForm : Form
         {
             currentQrUri = null;
             qrPreviewBox.Image = noQrImage;
-            qrPreviewBox.Cursor = Cursors.Default;
+            qrPreviewBox.Cursor = Cursors.Hand;
         }
+    }
+
+    private void CopyMfaCode()
+    {
+        if (string.IsNullOrEmpty(currentMfaCode))
+        {
+            MessageBox.Show(this, "Aucun code MFA valide à copier.", "Rien à copier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        Clipboard.SetText(currentMfaCode);
+        ShowCopyStatus("Code MFA copié.");
     }
 
     private void CopyToClipboard(string text, string statusMessage)
@@ -450,6 +501,15 @@ public sealed class EntryForm : Form
         }
 
         DialogResult = DialogResult.OK;
+    }
+
+    private void ApplyTotpUriChange(string totpUri)
+    {
+        totpUriTextBox.Text = totpUri;
+        Entry.TotpUri = totpUri;
+        Entry.UpdatedAt = DateTime.Now;
+        saveTotpChange?.Invoke(Clone(Entry));
+        RefreshTotpPreview();
     }
 
     private static Image LoadNoQrImage()
