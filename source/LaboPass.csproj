@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Content Include="Resources\LaboPass.ico" />
+    <EmbeddedResource Include="Resources\no-qr.png" />
   </ItemGroup>
 
 </Project>

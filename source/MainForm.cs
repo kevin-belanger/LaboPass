@@ -11,7 +11,9 @@ public sealed class MainForm : Form
     private readonly QrService qrService = new();
     private readonly List<VaultEntry> entries;
     private readonly DataGridView grid = new();
+    private readonly ContextMenuStrip gridContextMenu = new();
     private readonly System.Windows.Forms.Timer refreshTimer = new();
+    private readonly System.Windows.Forms.Timer statusResetTimer = new();
     private readonly Label statusLabel = new();
 
     public MainForm()
@@ -33,7 +35,28 @@ public sealed class MainForm : Form
         refreshTimer.Tick += (_, _) => RefreshTotpCells();
         refreshTimer.Start();
 
+        statusResetTimer.Interval = 4000;
+        statusResetTimer.Tick += (_, _) =>
+        {
+            statusResetTimer.Stop();
+            UpdateStorageStatus();
+        };
+
         Shown += MainForm_Shown;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            refreshTimer.Stop();
+            refreshTimer.Dispose();
+            statusResetTimer.Stop();
+            statusResetTimer.Dispose();
+            gridContextMenu.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     private VaultEntry? SelectedEntry => grid.CurrentRow?.DataBoundItem as VaultEntry;
@@ -69,6 +92,8 @@ public sealed class MainForm : Form
         grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Temps restant", Name = "TotpRemaining", FillWeight = 90 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", DataPropertyName = nameof(VaultEntry.Notes), FillWeight = 180 });
         grid.CellDoubleClick += (_, _) => EditSelected();
+        grid.CellMouseDown += Grid_CellMouseDown;
+        BuildGridContextMenu();
         root.Controls.Add(grid, 0, 1);
 
         statusLabel.Dock = DockStyle.Fill;
@@ -85,13 +110,35 @@ public sealed class MainForm : Form
 
         buttons.Controls.Add(MakeButton("Ajouter un identifiant", 190, (_, _) => AddEntry(), primary: true));
         buttons.Controls.Add(MakeButton("Modifier", 110, (_, _) => EditSelected()));
-        buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected(), danger: true));
         buttons.Controls.Add(MakeButton("Copier utilisateur", 155, (_, _) => CopySelectedUsername()));
         buttons.Controls.Add(MakeButton("Copier mot de passe", 175, (_, _) => CopySelectedPassword()));
-        buttons.Controls.Add(MakeButton("Afficher le QR", 140, (_, _) => ShowSelectedQr()));
+        buttons.Controls.Add(MakeButton("Copier code MFA", 155, (_, _) => CopySelectedMfaCode()));
+        buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected(), danger: true));
         root.Controls.Add(buttons, 0, 3);
 
         Controls.Add(root);
+    }
+
+    private void BuildGridContextMenu()
+    {
+        gridContextMenu.Items.Add("Modifier", null, (_, _) => EditSelected());
+        gridContextMenu.Items.Add(new ToolStripSeparator());
+        gridContextMenu.Items.Add("Copier utilisateur", null, (_, _) => CopySelectedUsername());
+        gridContextMenu.Items.Add("Copier mot de passe", null, (_, _) => CopySelectedPassword());
+        gridContextMenu.Items.Add("Copier code MFA", null, (_, _) => CopySelectedMfaCode());
+        grid.ContextMenuStrip = gridContextMenu;
+    }
+
+    private void Grid_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Right || e.RowIndex < 0)
+        {
+            return;
+        }
+
+        grid.ClearSelection();
+        grid.Rows[e.RowIndex].Selected = true;
+        grid.CurrentCell = grid.Rows[e.RowIndex].Cells[Math.Max(e.ColumnIndex, 0)];
     }
 
     private static Control CreateNoticePanel()
@@ -171,6 +218,11 @@ public sealed class MainForm : Form
         grid.DataSource = entries.OrderBy(e => e.Label).ToList();
         RestoreSelection(selectedId);
         RefreshTotpCells();
+        UpdateStorageStatus();
+    }
+
+    private void UpdateStorageStatus()
+    {
         statusLabel.Text = $"{entries.Count} identifiant(s) - stockage: {vaultStore.VaultPath}";
     }
 
@@ -279,8 +331,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        Clipboard.SetText(selected.Username);
-        statusLabel.Text = "Nom d'utilisateur copié.";
+        CopyTextToClipboard(selected.Username, "Nom d'utilisateur copié.", "Le nom d'utilisateur est vide.");
     }
 
     private void CopySelectedPassword()
@@ -292,8 +343,52 @@ public sealed class MainForm : Form
             return;
         }
 
-        Clipboard.SetText(selected.Password);
-        statusLabel.Text = "Mot de passe copié.";
+        CopyTextToClipboard(selected.Password, "Mot de passe copié.", "Le mot de passe est vide.");
+    }
+
+    private void CopySelectedMfaCode()
+    {
+        VaultEntry? selected = SelectedEntry;
+        if (selected is null)
+        {
+            ShowSelectionRequired();
+            return;
+        }
+
+        TotpDisplay display = totpService.GetDisplay(selected.TotpUri);
+        if (string.IsNullOrWhiteSpace(selected.TotpUri))
+        {
+            MessageBox.Show(this, "Cette entrée ne contient pas d'URI TOTP.", "Code MFA non disponible", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!display.IsValid || display.Code.Length == 0)
+        {
+            MessageBox.Show(this, display.Message.Length == 0 ? "L'URI TOTP est invalide." : display.Message, "Code MFA non disponible", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        Clipboard.SetText(display.Code);
+        ShowTemporaryStatus("Code MFA copié.");
+    }
+
+    private void CopyTextToClipboard(string text, string successMessage, string emptyMessage)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            MessageBox.Show(this, emptyMessage, "Rien à copier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        Clipboard.SetText(text);
+        ShowTemporaryStatus(successMessage);
+    }
+
+    private void ShowTemporaryStatus(string message)
+    {
+        statusLabel.Text = message;
+        statusResetTimer.Stop();
+        statusResetTimer.Start();
     }
 
     private void ShowSelectedQr()

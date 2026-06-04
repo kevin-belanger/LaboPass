@@ -1,3 +1,4 @@
+using System.Reflection;
 using LaboPass.Models;
 using LaboPass.Services;
 
@@ -5,6 +6,8 @@ namespace LaboPass.Forms;
 
 public sealed class EntryForm : Form
 {
+    private const string NoQrResourceName = "LaboPass.Resources.no-qr.png";
+
     private readonly QrService qrService;
     private readonly TotpService totpService;
     private readonly TextBox labelTextBox = new();
@@ -13,19 +16,26 @@ public sealed class EntryForm : Form
     private readonly TextBox totpUriTextBox = new();
     private readonly TextBox notesTextBox = new();
     private readonly Label totpStatusLabel = new();
+    private readonly Label copyStatusLabel = new();
+    private readonly PictureBox qrPreviewBox = new();
+    private readonly Image noQrImage;
     private readonly System.Windows.Forms.Timer totpRefreshTimer = new();
+    private readonly System.Windows.Forms.Timer copyStatusTimer = new();
+    private Image? qrPreviewImage;
+    private string? currentQrUri;
     private bool passwordVisible;
 
     public EntryForm(QrService qrService, TotpService totpService, VaultEntry? entry = null)
     {
         this.qrService = qrService;
         this.totpService = totpService;
+        noQrImage = LoadNoQrImage();
         Entry = entry is null ? new VaultEntry() : Clone(entry);
 
         Text = entry is null ? "Ajouter un identifiant" : "Modifier l'identifiant";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(780, 680);
-        Size = new Size(860, 720);
+        MinimumSize = new Size(940, 680);
+        Size = new Size(980, 720);
         Font = new Font("Segoe UI", 10F);
         Icon = AppIconProvider.GetApplicationIcon();
         BackColor = UiTheme.AppBackColor;
@@ -36,6 +46,13 @@ public sealed class EntryForm : Form
         totpRefreshTimer.Interval = 1000;
         totpRefreshTimer.Tick += (_, _) => RefreshTotpPreview();
         totpRefreshTimer.Start();
+
+        copyStatusTimer.Interval = 4000;
+        copyStatusTimer.Tick += (_, _) =>
+        {
+            copyStatusTimer.Stop();
+            copyStatusLabel.Text = "";
+        };
     }
 
     public VaultEntry Entry { get; private set; }
@@ -46,6 +63,10 @@ public sealed class EntryForm : Form
         {
             totpRefreshTimer.Stop();
             totpRefreshTimer.Dispose();
+            copyStatusTimer.Stop();
+            copyStatusTimer.Dispose();
+            qrPreviewImage?.Dispose();
+            noQrImage.Dispose();
         }
 
         base.Dispose(disposing);
@@ -57,11 +78,12 @@ public sealed class EntryForm : Form
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(18),
-            ColumnCount = 2,
-            RowCount = 9
+            ColumnCount = 3,
+            RowCount = 10
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 230));
 
         Label heading = new()
         {
@@ -72,7 +94,7 @@ public sealed class EntryForm : Form
             ForeColor = Color.FromArgb(35, 40, 46)
         };
         layout.Controls.Add(heading, 0, 0);
-        layout.SetColumnSpan(heading, 2);
+        layout.SetColumnSpan(heading, 3);
 
         AddRow(layout, 1, "Libellé", labelTextBox);
         AddRow(layout, 2, "Nom d'utilisateur", CreateTextBoxWithButtons(usernameTextBox, [
@@ -85,21 +107,11 @@ public sealed class EntryForm : Form
             MakeSmallButton("Copier", (_, _) => CopyToClipboard(passwordTextBox.Text, "Mot de passe copié."))
         ]));
 
-        AddRow(layout, 4, "URI TOTP complète", totpUriTextBox);
+        AddRow(layout, 4, "URI TOTP", totpUriTextBox);
         totpUriTextBox.TextChanged += (_, _) => RefreshTotpPreview();
 
-        FlowLayoutPanel qrButtons = new()
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false
-        };
-
         Button pasteQrButton = MakeActionButton("Coller le QR depuis le presse-papiers", 280, PasteQrButton_Click);
-        Button showQrButton = MakeActionButton("Afficher le QR", 140, ShowQrButton_Click);
-        qrButtons.Controls.Add(pasteQrButton);
-        qrButtons.Controls.Add(showQrButton);
-        AddRow(layout, 5, "", qrButtons);
+        AddRow(layout, 5, "", pasteQrButton);
 
         Panel totpPanel = CreateTotpPanel();
         layout.Controls.Add(new Label
@@ -111,10 +123,23 @@ public sealed class EntryForm : Form
         }, 0, 6);
         layout.Controls.Add(totpPanel, 1, 6);
 
+        Panel qrPanel = CreateQrPreviewPanel();
+        layout.Controls.Add(qrPanel, 2, 4);
+        layout.SetRowSpan(qrPanel, 3);
+
         notesTextBox.Multiline = true;
         notesTextBox.ScrollBars = ScrollBars.Vertical;
         notesTextBox.Height = 130;
-        AddRow(layout, 7, "Notes", notesTextBox);
+        AddRow(layout, 7, "Notes", notesTextBox, columnSpan: 2);
+
+        copyStatusLabel.Dock = DockStyle.Fill;
+        copyStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        copyStatusLabel.ForeColor = UiTheme.MutedTextColor;
+        copyStatusLabel.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
+        copyStatusLabel.Margin = new Padding(0);
+        layout.Controls.Add(new Label(), 0, 8);
+        layout.Controls.Add(copyStatusLabel, 1, 8);
+        layout.SetColumnSpan(copyStatusLabel, 2);
 
         FlowLayoutPanel buttons = new()
         {
@@ -140,9 +165,11 @@ public sealed class EntryForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        layout.Controls.Add(new Label(), 0, 8);
-        layout.Controls.Add(buttons, 1, 8);
+        layout.Controls.Add(new Label(), 0, 9);
+        layout.Controls.Add(buttons, 1, 9);
+        layout.SetColumnSpan(buttons, 2);
 
         Controls.Add(layout);
     }
@@ -169,7 +196,31 @@ public sealed class EntryForm : Form
         return panel;
     }
 
-    private static void AddRow(TableLayoutPanel layout, int row, string label, Control control)
+    private Panel CreateQrPreviewPanel()
+    {
+        Panel panel = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UiTheme.SurfaceColor,
+            Padding = new Padding(12),
+            Margin = new Padding(16, 8, 0, 8)
+        };
+        panel.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(210, 216, 224));
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        };
+
+        qrPreviewBox.Dock = DockStyle.Fill;
+        qrPreviewBox.SizeMode = PictureBoxSizeMode.Zoom;
+        qrPreviewBox.Image = noQrImage;
+        qrPreviewBox.Cursor = Cursors.Default;
+        qrPreviewBox.Click += QrPreviewBox_Click;
+        panel.Controls.Add(qrPreviewBox);
+        return panel;
+    }
+
+    private static void AddRow(TableLayoutPanel layout, int row, string label, Control control, int columnSpan = 1)
     {
         Label labelControl = new()
         {
@@ -188,6 +239,10 @@ public sealed class EntryForm : Form
 
         layout.Controls.Add(labelControl, 0, row);
         layout.Controls.Add(control, 1, row);
+        if (columnSpan > 1)
+        {
+            layout.SetColumnSpan(control, columnSpan);
+        }
     }
 
     private static Control CreateTextBoxWithButtons(TextBox textBox, IReadOnlyList<Button> buttons)
@@ -269,25 +324,16 @@ public sealed class EntryForm : Form
         totpUriTextBox.Text = uri;
     }
 
-    private void ShowQrButton_Click(object? sender, EventArgs e)
+    private void QrPreviewBox_Click(object? sender, EventArgs e)
     {
-        string uri = totpUriTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(uri))
+        if (currentQrUri is null)
         {
-            MessageBox.Show(this, "Aucune URI TOTP n'est configurée.", "QR non disponible", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        TotpDisplay display = totpService.GetDisplay(uri);
-        if (!display.IsValid || display.Code.Length == 0)
-        {
-            MessageBox.Show(this, display.Message.Length == 0 ? "L'URI TOTP est invalide." : display.Message, "URI TOTP invalide", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
         try
         {
-            using QrDisplayForm form = new(labelTextBox.Text.Trim(), uri, qrService);
+            using QrDisplayForm form = new(labelTextBox.Text.Trim(), currentQrUri, qrService);
             form.ShowDialog(this);
         }
         catch
@@ -309,11 +355,13 @@ public sealed class EntryForm : Form
 
     private void RefreshTotpPreview()
     {
-        TotpDisplay display = totpService.GetDisplay(totpUriTextBox.Text);
-        if (string.IsNullOrWhiteSpace(totpUriTextBox.Text))
+        string uri = totpUriTextBox.Text.Trim();
+        TotpDisplay display = totpService.GetDisplay(uri);
+        if (string.IsNullOrWhiteSpace(uri))
         {
             totpStatusLabel.Text = "Aucun TOTP configuré";
             totpStatusLabel.ForeColor = UiTheme.MutedTextColor;
+            UpdateQrPreview(null);
             return;
         }
 
@@ -321,11 +369,45 @@ public sealed class EntryForm : Form
         {
             totpStatusLabel.Text = display.Message;
             totpStatusLabel.ForeColor = UiTheme.ErrorColor;
+            UpdateQrPreview(null);
             return;
         }
 
         totpStatusLabel.Text = $"{display.Code} - {display.SecondsRemaining} s";
         totpStatusLabel.ForeColor = SystemColors.ControlText;
+        UpdateQrPreview(uri);
+    }
+
+    private void UpdateQrPreview(string? validUri)
+    {
+        if (validUri == currentQrUri)
+        {
+            return;
+        }
+
+        currentQrUri = validUri;
+        qrPreviewImage?.Dispose();
+        qrPreviewImage = null;
+
+        if (validUri is null)
+        {
+            qrPreviewBox.Image = noQrImage;
+            qrPreviewBox.Cursor = Cursors.Default;
+            return;
+        }
+
+        try
+        {
+            qrPreviewImage = qrService.CreateQrImage(validUri, 6);
+            qrPreviewBox.Image = qrPreviewImage;
+            qrPreviewBox.Cursor = Cursors.Hand;
+        }
+        catch
+        {
+            currentQrUri = null;
+            qrPreviewBox.Image = noQrImage;
+            qrPreviewBox.Cursor = Cursors.Default;
+        }
     }
 
     private void CopyToClipboard(string text, string statusMessage)
@@ -337,8 +419,14 @@ public sealed class EntryForm : Form
         }
 
         Clipboard.SetText(text);
-        totpStatusLabel.Text = statusMessage;
-        totpStatusLabel.ForeColor = UiTheme.MutedTextColor;
+        ShowCopyStatus(statusMessage);
+    }
+
+    private void ShowCopyStatus(string message)
+    {
+        copyStatusLabel.Text = message;
+        copyStatusTimer.Stop();
+        copyStatusTimer.Start();
     }
 
     private void SaveButton_Click(object? sender, EventArgs e)
@@ -362,6 +450,32 @@ public sealed class EntryForm : Form
         }
 
         DialogResult = DialogResult.OK;
+    }
+
+    private static Image LoadNoQrImage()
+    {
+        Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(NoQrResourceName);
+        if (stream is null)
+        {
+            return CreateFallbackNoQrImage();
+        }
+
+        using (stream)
+        {
+            return Image.FromStream(stream);
+        }
+    }
+
+    private static Image CreateFallbackNoQrImage()
+    {
+        Bitmap bitmap = new(220, 220);
+        using Graphics graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.FromArgb(242, 244, 247));
+        using Pen pen = new(Color.FromArgb(210, 216, 224), 2);
+        graphics.DrawRectangle(pen, 24, 24, 172, 172);
+        using Font font = new("Segoe UI", 11F, FontStyle.Bold);
+        TextRenderer.DrawText(graphics, "Aucun QR", font, new Rectangle(0, 92, 220, 30), UiTheme.MutedTextColor, TextFormatFlags.HorizontalCenter);
+        return bitmap;
     }
 
     private static VaultEntry Clone(VaultEntry entry) => new()
