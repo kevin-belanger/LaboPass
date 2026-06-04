@@ -1,6 +1,7 @@
 using LaboPass.Forms;
 using LaboPass.Models;
 using LaboPass.Services;
+using System.Diagnostics;
 
 namespace LaboPass;
 
@@ -16,6 +17,7 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer statusResetTimer = new();
     private readonly Label statusLabel = new();
     private readonly Button openVaultButton = new();
+    private readonly Label versionLabel = new();
 
     public MainForm()
     {
@@ -67,13 +69,14 @@ public sealed class MainForm : Form
         TableLayoutPanel root = new()
         {
             Dock = DockStyle.Fill,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(18)
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
 
         root.Controls.Add(CreateNoticePanel(), 0, 0);
 
@@ -116,6 +119,15 @@ public sealed class MainForm : Form
         buttons.Controls.Add(MakeButton("Copier code MFA", 155, (_, _) => CopySelectedMfaCode()));
         buttons.Controls.Add(MakeButton("Supprimer", 110, (_, _) => DeleteSelected(), danger: true));
         root.Controls.Add(buttons, 0, 3);
+
+        versionLabel.Text = $"LaboPass v{AppInfo.AppVersion}";
+        versionLabel.Dock = DockStyle.Fill;
+        versionLabel.TextAlign = ContentAlignment.MiddleRight;
+        versionLabel.ForeColor = UiTheme.MutedTextColor;
+        versionLabel.Font = new Font(Font.FontFamily, 8.5F, FontStyle.Regular);
+        versionLabel.Cursor = Cursors.Hand;
+        versionLabel.Click += VersionLabel_Click;
+        root.Controls.Add(versionLabel, 0, 4);
 
         Controls.Add(root);
     }
@@ -286,6 +298,22 @@ public sealed class MainForm : Form
         entries.AddRange(loadedEntries);
         RefreshGrid();
         ShowTemporaryStatus("Coffre chargé.");
+    }
+
+    private void VersionLabel_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = AppInfo.GitHubUrl,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            MessageBox.Show(this, "Impossible d'ouvrir le lien GitHub.", "Lien non ouvert", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
     }
 
     private void RefreshTotpCells()
