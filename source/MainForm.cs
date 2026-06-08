@@ -199,7 +199,7 @@ public sealed class MainForm : Form
 
         Label title = new()
         {
-            Text = "Utilisation prévue",
+            Text = "Ne pas utiliser pour vos mots de passe personnels",
             Dock = DockStyle.Top,
             Height = 22,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
