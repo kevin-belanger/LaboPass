@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LaboPass - Guide d'utilisation</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --text: #1f2933;
+      --muted: #5f6b7a;
+      --primary: #266096;
+      --primary-dark: #1d4d7b;
+      --border: #d9e0e8;
+      --notice: #fff8e6;
+      --notice-border: #e6d19c;
+      --danger: #8f2f2f;
+      --shadow: 0 14px 34px rgba(31, 41, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--primary);
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 18px 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 28px;
+      align-items: center;
+      margin-bottom: 34px;
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2.2rem, 4vw, 3.8rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 58ch;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 6px;
+      border: 1px solid var(--primary);
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button:hover {
+      background: var(--primary-dark);
+    }
+
+    .button.secondary {
+      background: var(--surface);
+      color: var(--primary);
+    }
+
+    .hero-shot,
+    .screenshot {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      background: var(--surface);
+    }
+
+    .section {
+      margin-top: 28px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(31, 41, 51, 0.04);
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 1.55rem;
+      letter-spacing: 0;
+    }
+
+    .section h3 {
+      margin: 22px 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: step;
+    }
+
+    .steps li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .mini {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .mini strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .notice {
+      border-color: var(--notice-border);
+      background: var(--notice);
+    }
+
+    .notice strong {
+      color: var(--danger);
+    }
+
+    .caption {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @media (max-width: 820px) {
+      .hero,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page {
+        padding-top: 18px;
+      }
+
+      .section {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>LaboPass</h1>
+        <p>
+          Un petit outil Windows pour conserver des identifiants de laboratoire,
+          des mots de passe de test et des codes MFA/TOTP au même endroit.
+        </p>
+        <div class="actions">
+          <a class="button" href="https://github.com/kevin-belanger/LaboPass/raw/main/LaboPass.exe">Télécharger LaboPass.exe</a>
+          <a class="button secondary" href="https://github.com/kevin-belanger/LaboPass">Voir le projet GitHub</a>
+        </div>
+      </div>
+      <img class="hero-shot" src="screenshot-labopass1.jpg" alt="Fenêtre principale de LaboPass avec une liste d'identifiants et des codes MFA.">
+    </section>
+
+    <section class="section notice">
+      <h2>À savoir avant de commencer</h2>
+      <p>
+        <strong>LaboPass est conçu pour les environnements de test.</strong>
+        Les données sont enregistrées localement sans chiffrement. Ne l’utilisez pas
+        pour des comptes personnels, réels ou de production.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Démarrer rapidement</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <strong>Téléchargez l’application.</strong><br>
+            Cliquez sur le bouton de téléchargement, puis gardez le fichier
+            <code>LaboPass.exe</code> dans un dossier facile à retrouver.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Ouvrez LaboPass.</strong><br>
+            Double-cliquez sur <code>LaboPass.exe</code>. Le fichier de données
+            <code>vault.json</code> sera créé automatiquement dans le même dossier.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Ajoutez un identifiant.</strong><br>
+            Cliquez sur <em>Ajouter un identifiant</em>, puis inscrivez un libellé,
+            un nom d’utilisateur et un mot de passe.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Importez le QR MFA au besoin.</strong><br>
+            Si un service affiche un code QR pour l’authentification MFA, copiez
+            l’image du QR, puis utilisez le bouton d’import dans LaboPass.
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>Ce que vous voyez dans la fenêtre principale</h2>
+      <div class="grid">
+        <div class="mini">
+          <strong>Libellé</strong>
+          Le nom que vous donnez à l’entrée, par exemple le nom d’un élève, d’un labo ou d’un compte.
+        </div>
+        <div class="mini">
+          <strong>Nom d’utilisateur</strong>
+          L’adresse ou l’identifiant utilisé pour se connecter.
+        </div>
+        <div class="mini">
+          <strong>Code MFA</strong>
+          Le code temporaire à saisir quand le service demande une vérification MFA.
+        </div>
+      </div>
+      <p class="caption">
+        Les boutons du bas servent à ajouter, modifier, copier ou supprimer une entrée sélectionnée.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Ajouter ou modifier une entrée</h2>
+      <img class="screenshot" src="screenshot-labopass2.jpg" alt="Fenêtre de modification d'un identifiant dans LaboPass.">
+      <p class="caption">
+        Le mot de passe est masqué par défaut. Le code MFA se rafraîchit automatiquement
+        lorsque l’entrée contient un QR TOTP valide.
+      </p>
+
+      <h3>Copier une information</h3>
+      <p>
+        Sélectionnez une entrée, puis utilisez les boutons <em>Copier utilisateur</em>,
+        <em>Copier mot de passe</em> ou <em>Copier code MFA</em>. Vous pouvez aussi
+        faire un clic droit sur la liste pour afficher les mêmes actions.
+      </p>
+
+      <h3>Modifier ou supprimer le QR TOTP</h3>
+      <p>
+        Dans la fenêtre d’un identifiant, cliquez sur l’image du QR. Vous pourrez voir
+        le QR en plus grand, modifier l’URI TOTP ou supprimer le QR associé à l’entrée.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Où sont enregistrées les données?</h2>
+      <p>
+        Par défaut, LaboPass utilise un fichier nommé <code>vault.json</code>, placé
+        dans le même dossier que <code>LaboPass.exe</code>. C’est ce fichier qui contient
+        les identifiants, les mots de passe, les notes et les informations TOTP.
+      </p>
+      <p>
+        Si votre enseignant vous donne un autre fichier JSON, utilisez le bouton
+        <em>Ouvrir...</em> dans le bas de l’application pour le charger.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Conseils simples</h2>
+      <div class="grid">
+        <div class="mini">
+          <strong>Gardez les fichiers ensemble</strong>
+          Conservez <code>LaboPass.exe</code> et <code>vault.json</code> dans le même dossier.
+        </div>
+        <div class="mini">
+          <strong>Une seule fenêtre</strong>
+          LaboPass empêche l’ouverture de plusieurs copies en même temps pour éviter les conflits d’écriture.
+        </div>
+        <div class="mini">
+          <strong>Vérifiez l’heure du PC</strong>
+          Les codes MFA dépendent de l’heure. Si l’heure du PC est décalée, les codes peuvent être refusés.
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      LaboPass v1.0.0 · Projet pédagogique open source sous licence MIT
+    </footer>
+  </main>
+</body>
+</html>
